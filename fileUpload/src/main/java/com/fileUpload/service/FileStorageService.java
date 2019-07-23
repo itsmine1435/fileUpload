@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,96 +34,53 @@ import com.fileUpload.model.Image;
 @Transactional
 public class FileStorageService {
 
-    private final Path fileStorageLocation;
-    
-    private Path newpath;
-    
-    private static final Logger logger = LoggerFactory.getLogger(FileStorageService.class);
-    
-    @Autowired
-    private DocumentDAO documentDAO;
-    
-    @Autowired
-    private ImageDAO imageDAO;
+	private final Path fileStorageLocation;
 
-   @Autowired
-    public FileStorageService(FileStorageProperties fileStorageProperties) {
-        this.fileStorageLocation = Paths.get(fileStorageProperties.getUploadDir())
-                .toAbsolutePath().normalize();
-        
-        logger.info("fileStorageLocation",fileStorageLocation);
+	private static final Logger logger = LoggerFactory.getLogger(FileStorageService.class);
 
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception ex) {
-            throw new FileStorageException("Could not create the directory where the uploaded files will be stored.", ex);
-        }
-    }
+	@Autowired
+	private DocumentDAO documentDAO;
 
-    public String storeFile(MultipartFile file,String title,String decsription) {
-    	String result;
-    	String folder;
-        // Normalize file name
-        String fileName = StringUtils.cleanPath(file.getOriginalFilename());
-        logger.info("fileName{}" , fileName);
-        
-        Document document = createDocument(title,decsription);
-        logger.info("document{}" , document.toString());
+	@Autowired
+	private ImageDAO imageDAO;
 
-      
-            // Check if the file's name contains invalid characters
-            if(fileName.contains("..")) {
-            	result = "Failed to save";
-                throw new FileStorageException("Sorry! Filename contains invalid path sequence " + fileName);
-            }
+	@Autowired
+	public FileStorageService(FileStorageProperties fileStorageProperties) {
+		this.fileStorageLocation = Paths.get(fileStorageProperties.getUploadDir()).toAbsolutePath().normalize();
 
-            // Copy file to the target location (Replacing existing file with the same name)
-            //Path targetLocation = this.fileStorageLocation.resolve(fileName);
-            try
-            {
-            	folder = "D:\\images\\" + document.getId() + "_";	
-            File newFile = new File(folder);
-            if(newFile.exists())
-            {
-            	 logger.info("folder already exists");	
-            	 result = "Failed to save";
-            }
-            else
-            {
-            newFile.mkdir();
-            newpath = Paths.get(folder).resolve(fileName);
-            logger.info("newPath{}",newpath);
-            saveImagePath(newpath,document);
-            Files.copy(file.getInputStream(), newpath, StandardCopyOption.REPLACE_EXISTING);
-            result = "Successfully uploaded";
-            }
-           
-            }
-            catch(Exception e)
-            {
-            	result = "Failed to save";
-            	logger.info("exc {}",e);
-            }
-            return result;
-        
-    }
+		logger.info("fileStorageLocation", fileStorageLocation);
 
-	public Resource loadFileAsResource(String fileName) {
-        try {
-            Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
-            Resource resource = new UrlResource(filePath.toUri());
-            if(resource.exists()) {
-                return resource;
-            } else {
-                throw new MyFileNotFoundException("File not found " + fileName);
-            }
-        } catch (MalformedURLException ex) {
-            throw new MyFileNotFoundException("File not found " + fileName, ex);
-        }
-    }
+		try {
+			Files.createDirectories(this.fileStorageLocation);
+		} catch (Exception ex) {
+			throw new FileStorageException("Could not create the directory where the uploaded files will be stored.",
+					ex);
+		}
+	}
+
+	public String addDocument(MultipartFile file, String title, String decsription) {
+		String result = null;
+		
+		Document document = createDocument(title, decsription);
+		logger.info("document{}", document.toString());
+
+		Path newpath = getPath(document , file);
+		logger.info("path{}", newpath.toString());
+
+		// Path targetLocation = this.fileStorageLocation.resolve(fileName);
+		if(newpath != null)
+		{
+			Set<Image> images = new HashSet<Image>();
+			saveImagePath(newpath,document,images);
+			result = "Successfully uploaded";
+		}
+		
+		return result;
+
+	}
 
 	private Document createDocument(String title, String decsription) {
-		logger.info("at create document {}",title + decsription);
+		logger.info("at create document {}", title + decsription);
 		Document document = new Document();
 		document.setTitle(title);
 		document.setDecsription(decsription);
@@ -130,13 +89,54 @@ public class FileStorageService {
 		return document;
 	}
 
-	private void saveImagePath(Path targetLocation, Document document) {
-		logger.info("at saveImagePath{}",targetLocation.toAbsolutePath());
+	private void saveImagePath(Path path, Document document, Set<Image> images) {
+		logger.info("at saveImagePath{}", path.toAbsolutePath());
 		Image image = new Image();
-		image.setImagePath(targetLocation.toString());
+		image.setImagePath(path.toString());
 		image.setDocument(document);
 		imageDAO.save(image);
+		images.add(image);
+		document.setImage(images);
+		documentDAO.saveOrUpdate(document);
+	}
 
+	public String uploadImage(MultipartFile file, Long documentId) {
+		
+		Document document = documentDAO.findOne(documentId);
+		
+		if(document !=null)
+		{
+			Path newpath = getPath(document , file);
+			logger.info("path{}", newpath.toString());
+			Set<Image> images = document.getImage();
+			saveImagePath(newpath,document,images);
+			return "Successfully uploaded";
+		}
+		
+		return "Failed to upload";
+	}
+
+	private Path getPath(Document document, MultipartFile file) {
+		String folder;
+		Path path = null;
+		try {
+			folder = "D:\\images\\" + document.getId() + "_";
+			File newFile = new File(folder);
+			if (newFile.exists()) {
+				logger.info("folder already exists");
+				path = Paths.get(folder).resolve(file.getOriginalFilename());
+				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+			} else {
+				newFile.mkdir();
+				path = Paths.get(folder).resolve(file.getOriginalFilename());
+				logger.info("newPath{}", path);
+				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+			}
+
+		} catch (Exception e) {
+			logger.info("exc {}", e);
+		}
+		return path;
 	}
 
 }

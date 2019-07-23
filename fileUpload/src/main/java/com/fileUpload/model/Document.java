@@ -63,6 +63,14 @@ public class Document {
 	public void setDate(Date date) {
 		this.date = date;
 	}
+	
+	public Set<Image> getImage() {
+		return image;
+	}
+
+	public void setImage(Set<Image> image) {
+		this.image = image;
+	}
 
 	@Override
 	public String toString() {

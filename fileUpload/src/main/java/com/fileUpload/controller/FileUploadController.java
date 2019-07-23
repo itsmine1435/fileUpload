@@ -27,12 +27,21 @@ public class FileUploadController {
 	@Autowired
 	private FileStorageService fileStorageService;
 
-	@PostMapping("/uploadFile")
-	public String uploadFile(@RequestParam("file") MultipartFile file ,@RequestParam("title") String title ,@RequestParam("decsription") String decsription) {
-		logger.info("Uploading file{}" , "\t" +title + "\t" +decsription);
-		String result = fileStorageService.storeFile(file,title,decsription);
+	@PostMapping("/addDocument")
+	public String addDocument(@RequestParam("file") MultipartFile file ,@RequestParam("title") String title ,@RequestParam("decsription") String decsription) {
+		logger.info("Creating new document{}" , "\t" +title + "\t" +decsription);
+		String result = fileStorageService.addDocument(file,title,decsription);
 		String fileName = StringUtils.cleanPath(file.getOriginalFilename());
 		return result + "\t" + fileName;
+	}
+	
+	@PostMapping("/uploadImage")
+	public String uploadImage(@RequestParam("file") MultipartFile file ,@RequestParam("documentId") Long documentId)
+	{
+		logger.info("Uploading file to existing document{}" , documentId);
+		String result = fileStorageService.uploadImage(file , documentId);
+		return result;
+		
 	}
 
 }
