@@ -1,6 +1,7 @@
 package com.fileUpload.model;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import javax.persistence.Column;
@@ -30,7 +31,7 @@ public class Document {
 	private Date date;
 
 	@OneToMany(mappedBy = "document")
-	private Set<Image> image;
+	private List<Image> image;
 
 	public Long getId() {
 		return id;
@@ -64,11 +65,11 @@ public class Document {
 		this.date = date;
 	}
 	
-	public Set<Image> getImage() {
+	public List<Image> getImage() {
 		return image;
 	}
 
-	public void setImage(Set<Image> image) {
+	public void setImage(List<Image> image) {
 		this.image = image;
 	}
 

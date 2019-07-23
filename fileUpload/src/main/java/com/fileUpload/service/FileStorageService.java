@@ -7,8 +7,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -35,7 +37,9 @@ import com.fileUpload.model.Image;
 public class FileStorageService {
 
 	private final Path fileStorageLocation;
-
+	
+	String folder;
+	
 	private static final Logger logger = LoggerFactory.getLogger(FileStorageService.class);
 
 	@Autowired
@@ -70,8 +74,8 @@ public class FileStorageService {
 		// Path targetLocation = this.fileStorageLocation.resolve(fileName);
 		if(newpath != null)
 		{
-			Set<Image> images = new HashSet<Image>();
-			saveImagePath(newpath,document,images);
+			List<Image> images = new ArrayList<Image>();
+			saveImagePath(newpath,document,images,file);
 			result = "Successfully uploaded";
 		}
 		
@@ -89,15 +93,17 @@ public class FileStorageService {
 		return document;
 	}
 
-	private void saveImagePath(Path path, Document document, Set<Image> images) {
+	private Image saveImagePath(Path path, Document document, List<Image> images,MultipartFile file) {
 		logger.info("at saveImagePath{}", path.toAbsolutePath());
 		Image image = new Image();
 		image.setImagePath(path.toString());
 		image.setDocument(document);
 		imageDAO.save(image);
+		copyImage(path,file,image.getId());
 		images.add(image);
 		document.setImage(images);
 		documentDAO.saveOrUpdate(document);
+		return image;
 	}
 
 	public String uploadImage(MultipartFile file, Long documentId) {
@@ -108,8 +114,8 @@ public class FileStorageService {
 		{
 			Path newpath = getPath(document , file);
 			logger.info("path{}", newpath.toString());
-			Set<Image> images = document.getImage();
-			saveImagePath(newpath,document,images);
+			List<Image> images = document.getImage();
+			saveImagePath(newpath,document,images,file);
 			return "Successfully uploaded";
 		}
 		
@@ -117,20 +123,19 @@ public class FileStorageService {
 	}
 
 	private Path getPath(Document document, MultipartFile file) {
-		String folder;
 		Path path = null;
 		try {
-			folder = "D:\\images\\" + document.getId() + "_";
+			folder = "D:\\images\\" + document.getId();
 			File newFile = new File(folder);
 			if (newFile.exists()) {
 				logger.info("folder already exists");
 				path = Paths.get(folder).resolve(file.getOriginalFilename());
-				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+				//Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
 			} else {
 				newFile.mkdir();
 				path = Paths.get(folder).resolve(file.getOriginalFilename());
-				logger.info("newPath{}", path);
-				Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+				logger.info("newPath{}", path.toString());
+				//Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
 			}
 
 		} catch (Exception e) {
@@ -138,5 +143,17 @@ public class FileStorageService {
 		}
 		return path;
 	}
+	
+	private void copyImage(Path path,MultipartFile file, Long id) {
+		try {
+			String filename = id + "_" + file.getOriginalFilename();
+			path = Paths.get(folder).resolve(filename);
+			Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+		} catch (Exception e) {
+			logger.info("exc {}", e);
+		}
+		
+	}
+
 
 }
